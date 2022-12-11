@@ -44,9 +44,21 @@
 #include <fuse_variables/orientation_2d_stamped.hpp>
 #include <fuse_variables/position_2d_stamped.hpp>
 
-#include <ros/ros.h>
+#include <pluginlib/class_list_macros.hpp>
+#include <tf2/utils.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+
+
+#include <rclcpp/rclcpp.hpp>
+#include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
+
+
 
 #include <memory>
 #include <string>
@@ -156,8 +168,8 @@ protected:
   fuse_core::UUID device_id_;  //!< The UUID of the device to be published
   std::string map_frame_;  //!< The name of the robot's map frame
   std::string odom_frame_;  //!< The name of the odom frame for this pose (or empty if the odom is not used)
-  ros::Publisher pose_publisher_;  //!< Publish the pose as a geometry_msgs::msg::PoseStamped
-  ros::Publisher pose_with_covariance_publisher_;  //!< Publish the pose as a geometry_msgs::msg::PoseWithCovarianceStamped
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher_;  //!< Publish the pose as a geometry_msgs::PoseStamped
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_with_covariance_publisher_;  //!< Publish the pose as a geometry_msgs::PoseWithCovarianceStamped
   bool publish_to_tf_;  //!< Flag indicating the pose should be sent to the tf system as well as the pose topics
   Synchronizer::UniquePtr synchronizer_;  //!< Object that tracks the latest common timestamp of multiple variables
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;  //!< TF2 object that supports querying transforms by time and frame id

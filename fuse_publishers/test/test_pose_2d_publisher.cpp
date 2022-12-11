@@ -41,7 +41,7 @@
 #include <fuse_variables/position_2d_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <tf2/utils.h>
 #include <tf2_msgs/msg/tf_message.hpp>
 #include <tf2_ros/static_transform_broadcaster.h>

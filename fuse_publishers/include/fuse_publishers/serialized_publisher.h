@@ -39,7 +39,11 @@
 #include <fuse_core/fuse_macros.hpp>
 #include <fuse_core/throttled_callback.hpp>
 #include <fuse_core/transaction.hpp>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
+
+#include <fuse_msgs/msg/serialized_graph.hpp>
+#include <fuse_msgs/msg/serialized_transaction.hpp>
+
 
 #include <string>
 
@@ -91,8 +95,8 @@ protected:
   void graphPublisherCallback(fuse_core::Graph::ConstSharedPtr graph, const rclcpp::Time& stamp) const;
 
   std::string frame_id_;  //!< The name of the frame for the serialized graph and transaction messages published
-  ros::Publisher graph_publisher_;
-  ros::Publisher transaction_publisher_;
+  rclcpp::Publisher<fuse_msgs::msg::SerializedGraph>::SharedPtr graph_publisher_;
+  rclcpp::Publisher<fuse_msgs::msg::SerializedTransaction>::SharedPtr transaction_publisher_;
 
   using GraphPublisherCallback = std::function<void(fuse_core::Graph::ConstSharedPtr, const rclcpp::Time&)>;
   using GraphPublisherThrottledCallback = fuse_core::ThrottledCallback<GraphPublisherCallback>;

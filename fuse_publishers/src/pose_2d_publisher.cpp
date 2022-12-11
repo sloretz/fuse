@@ -35,6 +35,7 @@
 
 #include <fuse_core/async_publisher.hpp>
 #include <fuse_core/graph.hpp>
+#include <fuse_core/node_interfaces/node_interfaces.hpp>
 #include <fuse_core/time.hpp>
 #include <fuse_core/transaction.hpp>
 #include <fuse_core/uuid.hpp>
@@ -43,15 +44,16 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/clock.hpp>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
+#include <fuse_core/parameter.hpp>
+
+#include <chrono>
 #include <exception>
-#include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -64,13 +66,20 @@ namespace
 {
 
 bool findPose(
+  fuse_core::node_interfaces::NodeInterfaces<
+    fuse_core::node_interfaces::Logging,
+    fuse_core::node_interfaces::Clock
+  > interfaces,
   const fuse_core::Graph& graph,
   const rclcpp::Time& stamp,
   const fuse_core::UUID& device_id,
   fuse_core::UUID& orientation_uuid,
   fuse_core::UUID& position_uuid,
-  geometry_msgs::msg::Pose& pose)
+  geometry_msgs::msg::Pose& pose
+)
 {
+  auto logger = interfaces.get_node_logging_interface()->get_logger();
+  auto clock = interfaces.get_node_clock_interface()->get_clock();
   try
   {
     orientation_uuid = fuse_variables::Orientation2DStamped(stamp, device_id).uuid();
@@ -86,14 +95,14 @@ bool findPose(
   }
   catch (const std::exception& e)
   {
-    RCLCPP_WARN_STREAM_THROTTLE(rclcpp::get_logger("fuse"), rclcpp::Clock(), 10.0 * 1000,
-                                "Failed to find a pose at time " << stamp << ". Error" << e.what());
+    RCLCPP_WARN_STREAM_THROTTLE(logger, *clock, 10.0 * 1000,
+                                "Failed to find a pose at time " << stamp.nanoseconds() << ". Error" << e.what());
     return false;
   }
   catch (...)
   {
-    RCLCPP_WARN_STREAM_THROTTLE(rclcpp::get_logger("fuse"), rclcpp::Clock(), 10.0 * 1000,
-                                "Failed to find a pose at time " << stamp << ". Error: unknown");
+    RCLCPP_WARN_STREAM_THROTTLE(logger, *clock, 10.0 * 1000,
+                                "Failed to find a pose at time " << stamp.nanoseconds() << ". Error: unknown");
     return false;
   }
   return true;
@@ -108,6 +117,8 @@ Pose2DPublisher::Pose2DPublisher() :
   fuse_core::AsyncPublisher(1),
   device_id_(fuse_core::uuid::NIL),
   publish_to_tf_(false),
+  tf_publisher_(node_),
+  tf_timeout_(rclcpp::Duration(0, 0)),
   use_tf_lookup_(false)
 {
 }
@@ -115,19 +126,24 @@ Pose2DPublisher::Pose2DPublisher() :
 void Pose2DPublisher::onInit()
 {
   // Read configuration from the parameter server
-  private_node_handle_.param("base_frame", base_frame_, std::string("base_link"));
-  private_node_handle_.param("map_frame", map_frame_, std::string("map"));
-  private_node_handle_.param("odom_frame", odom_frame_, std::string("odom"));
+  base_frame_ = fuse_core::getParam(node_, "base_frame", std::string("base_link"));
+  map_frame_ = fuse_core::getParam(node_, "map_frame", std::string("map"));
+  odom_frame_ = fuse_core::getParam(node_, "odom_frame", std::string("odom"));
+
   std::string device_str;
-  if (private_node_handle_.getParam("device_id", device_str))
+  fuse_core::getParam(node_, "device_id", device_str);
+  if (device_str != "")
   {
     device_id_ = fuse_core::uuid::from_string(device_str);
   }
-  else if (private_node_handle_.getParam("device_name", device_str))
-  {
-    device_id_ = fuse_core::uuid::generate(device_str);
+  else{
+    fuse_core::getParam(node_, "device_name", device_str);
+    if (device_str != "")
+    {
+      device_id_ = fuse_core::uuid::generate(device_str);
+    }
   }
-  private_node_handle_.param("publish_to_tf", publish_to_tf_, false);
+  publish_to_tf_ = fuse_core::getParam(node_, "publish_to_tf", false);
 
   // Configure tf, if requested
   if (publish_to_tf_)
@@ -137,34 +153,41 @@ void Pose2DPublisher::onInit()
     {
       double tf_cache_time;
       double default_tf_cache_time = 10.0;
-      private_node_handle_.param("tf_cache_time", tf_cache_time, default_tf_cache_time);
+      tf_cache_time = fuse_core::getParam(node_, "tf_cache_time", default_tf_cache_time);
       if (tf_cache_time <= 0)
       {
-        RCLCPP_WARN_STREAM(node_->get_logger(),
-                           "The requested tf_cache_time is <= 0. Using the default value (" <<
-                           default_tf_cache_time << "s) instead.");
+        RCLCPP_WARN_STREAM(
+          node_->get_logger(),
+          "The requested tf_cache_time is <= 0. Using the default value ("
+          << default_tf_cache_time << "s) instead.");
         tf_cache_time = default_tf_cache_time;
       }
 
       double tf_timeout;
       double default_tf_timeout = 0.1;
-      private_node_handle_.param("tf_timeout", tf_timeout, default_tf_timeout);
+      tf_timeout = fuse_core::getParam(node_, "tf_timeout", default_tf_timeout);
       if (tf_timeout <= 0)
       {
-        RCLCPP_WARN_STREAM(node_->get_logger(),
-                           "The requested tf_timeout is <= 0. Using the default value (" <<
-                           default_tf_timeout << "s) instead.");
+        RCLCPP_WARN_STREAM(
+          node_->get_logger(),
+          "The requested tf_timeout is <= 0. Using the default value ("
+          << default_tf_timeout << "s) instead.");
         tf_timeout = default_tf_timeout;
       }
       tf_timeout_ = rclcpp::Duration::from_seconds(tf_timeout);
 
-      tf_buffer_ = std::make_unique<tf2_ros::Buffer>(rclcpp::Duration::from_seconds(tf_cache_time));
-      tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_, node_handle_);
+      tf_buffer_ = std::make_unique<tf2_ros::Buffer>(
+        node_->get_clock(),
+        rclcpp::Duration::from_seconds(tf_cache_time)
+          .to_chrono<std::chrono::nanoseconds>(),
+        node_);
+      tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_, node_);
     }
 
     double tf_publish_frequency;
     double default_tf_publish_frequency = 10.0;
-    private_node_handle_.param("tf_publish_frequency", tf_publish_frequency, default_tf_publish_frequency);
+
+    tf_publish_frequency = fuse_core::getParam(node_, "tf_publish_frequency", default_tf_publish_frequency);
     if (tf_publish_frequency <= 0)
     {
       RCLCPP_WARN_STREAM(node_->get_logger(),
@@ -172,11 +195,18 @@ void Pose2DPublisher::onInit()
                          default_tf_publish_frequency << "hz) instead.");
       tf_publish_frequency = default_tf_publish_frequency;
     }
+
+    tf_publish_timer_ = node_->create_timer(
+      std::chrono::duration<double>(1.0 / tf_publish_frequency),
+      std::bind(&Pose2DPublisher::tfPublishTimerCallback, this)
+      // callback_group
+    );
   }
 
   // Advertise the topics
-  pose_publisher_ = private_node_handle_.advertise<geometry_msgs::msg::PoseStamped>("pose", 1);
-  pose_with_covariance_publisher_ = private_node_handle_.advertise<geometry_msgs::msg::PoseWithCovarianceStamped>(
+  pose_publisher_ = node_->create_publisher<geometry_msgs::msg::PoseStamped>("pose", 1);
+
+  pose_with_covariance_publisher_ = node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "pose_with_covariance", 1);
 }
 
@@ -189,10 +219,7 @@ void Pose2DPublisher::onStart()
   // Start the tf timer
   if (publish_to_tf_)
   {
-    tf_publish_timer_ = node_.create_timer(
-      rclcpp::Duration::from_seconds(1.0 / tf_publish_frequency),
-      std::bind(&Pose2DPublisher::tfPublishTimerCallback, this)
-    );
+    tf_publish_timer_.reset();  // Activate the timer again
   }
 }
 
@@ -201,7 +228,7 @@ void Pose2DPublisher::onStop()
   // Stop the tf timer
   if (publish_to_tf_)
   {
-    tf_publish_timer_.cancel();
+    tf_publish_timer_->cancel();
   }
 }
 
@@ -221,7 +248,7 @@ void Pose2DPublisher::notifyCallback(
   fuse_core::UUID orientation_uuid;
   fuse_core::UUID position_uuid;
   geometry_msgs::msg::Pose pose;
-  if (!findPose(*graph, latest_stamp, device_id_, orientation_uuid, position_uuid, pose))
+  if (!findPose(node_, *graph, latest_stamp, device_id_, orientation_uuid, position_uuid, pose))
   {
     return;
   }
@@ -263,15 +290,15 @@ void Pose2DPublisher::notifyCallback(
       tf_transform_ = map_to_base;
     }
   }
-  if (pose_publisher_.getNumSubscribers() > 0)
+  if (pose_publisher_->get_subscription_count() > 0)
   {
     geometry_msgs::msg::PoseStamped msg;
     msg.header.stamp = latest_stamp;
     msg.header.frame_id = map_frame_;
     msg.pose = pose;
-    pose_publisher_.publish(msg);
+    pose_publisher_->publish(msg);
   }
-  if (pose_with_covariance_publisher_.getNumSubscribers() > 0)
+  if (pose_with_covariance_publisher_->get_subscription_count() > 0)
   {
     // Get the covariance from the graph
     std::vector<std::pair<fuse_core::UUID, fuse_core::UUID>> requests;
@@ -293,7 +320,7 @@ void Pose2DPublisher::notifyCallback(
     msg.pose.covariance[30] = covariance_blocks[1][0];
     msg.pose.covariance[31] = covariance_blocks[1][1];
     msg.pose.covariance[35] = covariance_blocks[2][0];
-    pose_with_covariance_publisher_.publish(msg);
+    pose_with_covariance_publisher_->publish(msg);
   }
 }
 
@@ -304,7 +331,7 @@ void Pose2DPublisher::tfPublishTimerCallback()
   if (fuse_core::is_valid(tf_transform_.header.stamp))
   {
     // Update the timestamp of the transform so the tf tree will continue to be valid
-    tf_transform_.header.stamp = event.current_real;
+    tf_transform_.header.stamp = node_->now();
     tf_publisher_.sendTransform(tf_transform_);
   }
 }
