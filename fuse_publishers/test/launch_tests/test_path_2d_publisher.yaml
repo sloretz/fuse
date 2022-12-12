@@ -1,0 +1,3 @@
+test_path_2d_publisher_node:
+  ros__parameters:
+    frame_id: "test_map"

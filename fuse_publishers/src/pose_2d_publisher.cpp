@@ -131,13 +131,13 @@ void Pose2DPublisher::onInit()
   odom_frame_ = fuse_core::getParam(node_, "odom_frame", std::string("odom"));
 
   std::string device_str;
-  fuse_core::getParam(node_, "device_id", device_str);
+  device_str = fuse_core::getParam(node_, "device_id", device_str);
   if (device_str != "")
   {
     device_id_ = fuse_core::uuid::from_string(device_str);
   }
   else{
-    fuse_core::getParam(node_, "device_name", device_str);
+    device_str = fuse_core::getParam(node_, "device_name", device_str);
     if (device_str != "")
     {
       device_id_ = fuse_core::uuid::generate(device_str);

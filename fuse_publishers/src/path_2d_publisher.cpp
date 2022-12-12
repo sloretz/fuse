@@ -71,19 +71,19 @@ void Path2DPublisher::onInit()
 {
   // Configure the publisher
   std::string device_str;
-  fuse_core::getParam(node_, "device_id", device_str);
+  device_str = fuse_core::getParam(node_, "device_id", device_str);
   if (device_str != "")
   {
     device_id_ = fuse_core::uuid::from_string(device_str);
   }
   else{
-    fuse_core::getParam(node_, "device_name", device_str);
+    device_str = fuse_core::getParam(node_, "device_name", device_str);
     if (device_str != "")
     {
       device_id_ = fuse_core::uuid::generate(device_str);
     }
   }
-  fuse_core::getParam(node_, "frame_id", frame_id_);
+  frame_id_ = fuse_core::getParam(node_, "frame_id", frame_id_);
 
   // Advertise the topic
   path_publisher_ = node_->create_publisher<nav_msgs::msg::Path>("path", 1);

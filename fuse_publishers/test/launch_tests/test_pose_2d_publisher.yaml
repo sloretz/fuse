@@ -1,0 +1,6 @@
+test_pose_2d_publisher_node:
+  ros__parameters:
+    map_frame: "test_map"
+    odom_frame: "test_odom"
+    base_frame: "test_base"
+    publish_to_tf: false

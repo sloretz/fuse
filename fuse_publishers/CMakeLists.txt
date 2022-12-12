@@ -46,7 +46,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   pluginlib::pluginlib
   rclcpp::rclcpp
   tf2::tf2
-  tf2_geometry_msgs::tf2_geometry_msgs
+  ${tf2_geometry_msgs_TARGETS}
   tf2_ros::tf2_ros
 )
 

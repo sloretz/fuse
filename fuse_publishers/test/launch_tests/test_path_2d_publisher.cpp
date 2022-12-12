@@ -60,7 +60,6 @@ class Path2DPublisherTestFixture : public ::testing::Test
 {
 public:
   Path2DPublisherTestFixture() :
-    private_node_handle_("~"),
     graph_(fuse_graphs::HashGraph::make_shared()),
     transaction_(fuse_core::Transaction::make_shared()),
     received_path_msg_(false),
@@ -151,6 +150,24 @@ public:
     graph_->optimize();
   }
 
+  void SetUp()
+  {
+    executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+    spinner_ = std::thread(
+      [&]() {
+        executor_->spin();
+      });
+  }
+
+  void TearDown()
+  {
+    executor_->cancel();
+    if (spinner_.joinable()) {
+     spinner_.join();
+    }
+    executor_.reset();
+  }
+
   void pathCallback(const nav_msgs::msg::Path& msg)
   {
     path_msg_ = msg;
@@ -163,10 +180,10 @@ public:
     received_pose_array_msg_ = true;
   }
 
+   std::thread spinner_;  //!< Internal thread for spinning the executor
+   rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
+
 protected:
-  // TODO(CH3): Replace with node_ (also, we don't need to support node interfaces here since it's a test...)
-  ros::NodeHandle node_handle_;
-  ros::NodeHandle private_node_handle_;
   fuse_graphs::HashGraph::SharedPtr graph_;
   fuse_core::Transaction::SharedPtr transaction_;
   bool received_path_msg_;
@@ -178,35 +195,43 @@ protected:
 TEST_F(Path2DPublisherTestFixture, PublishPath)
 {
   // Test that the expected PoseStamped message is published
+  auto node = rclcpp::Node::make_shared("test_path_2d_publisher_node");
 
   // Create a publisher and send it the graph
-  private_node_handle_.setParam("test_publisher/frame_id", "test_map");
   fuse_publishers::Path2DPublisher publisher;
   publisher.initialize("test_publisher");
   publisher.start();
 
   // Subscribe to the "path" topic
-  ros::Subscriber subscriber1 = private_node_handle_.subscribe(
-    "test_publisher/path",
-    1,
-    &Path2DPublisherTestFixture::pathCallback,
-    reinterpret_cast<Path2DPublisherTestFixture*>(this));
+  auto subscriber1 = node->create_subscription<nav_msgs::msg::Path>(
+    "test_publisher/path", 1,
+    std::bind(&Path2DPublisherTestFixture::pathCallback, this, std::placeholders::_1));
+
+  // ros::Subscriber subscriber1 = private_node_handle_.subscribe(
+  //   "test_publisher/path",
+  //   1,
+  //   &Path2DPublisherTestFixture::pathCallback,
+  //   reinterpret_cast<Path2DPublisherTestFixture*>(this));
 
   // Subscribe to the "pose_array" topic
-  ros::Subscriber subscriber2 = private_node_handle_.subscribe(
-    "test_publisher/pose_array",
-    1,
-    &Path2DPublisherTestFixture::poseArrayCallback,
-    reinterpret_cast<Path2DPublisherTestFixture*>(this));
+  auto subscriber2 = node->create_subscription<geometry_msgs::msg::PoseArray>(
+    "test_publisher/pose_array", 1,
+    std::bind(&Path2DPublisherTestFixture::poseArrayCallback, this, std::placeholders::_1));
+
+  // ros::Subscriber subscriber2 = private_node_handle_.subscribe(
+  //   "test_publisher/pose_array",
+  //   1,
+  //   &Path2DPublisherTestFixture::poseArrayCallback,
+  //   reinterpret_cast<Path2DPublisherTestFixture*>(this));
 
   // Send the graph to the Publisher to trigger message publishing
   publisher.notify(transaction_, graph_);
 
   // Verify the subscriber received the expected pose
-  rclcpp::Time timeout = node_->now() + rclcpp::Duration::from_seconds(10.0);
-  while ((!received_path_msg_) && (node_->now() < timeout))
+  rclcpp::Time timeout = node->now() + rclcpp::Duration::from_seconds(10.0);
+  while ((!received_path_msg_) && (node->now() < timeout))
   {
-    rclcpp::sleep_for(rclcpp::Duration::from_seconds(0.10));
+    rclcpp::sleep_for(rclcpp::Duration::from_seconds(0.10).to_chrono<std::chrono::nanoseconds>());
   }
 
   ASSERT_TRUE(received_path_msg_);
@@ -257,15 +282,13 @@ TEST_F(Path2DPublisherTestFixture, PublishPath)
   EXPECT_NEAR(3.02, tf2::getYaw(pose_array_msg_.poses[2].orientation), 1.0e-9);
 }
 
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  ros::init(argc, argv, "test_path_2d_publisher");
 
-  ros::AsyncSpinner spinner(1);
-  spinner.start();
+// NOTE(CH3): This main is required because the test is manually run by a launch test
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+  testing::InitGoogleTest(&argc, argv);
   int ret = RUN_ALL_TESTS();
-  spinner.stop();
-  ros::shutdown();
+  rclcpp::shutdown();
   return ret;
 }
