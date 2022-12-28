@@ -63,15 +63,19 @@ void SerializedPublisher::initialize(
   fuse_core::node_interfaces::NodeInterfaces<
     fuse_core::node_interfaces::Base,
     fuse_core::node_interfaces::Clock,
+    fuse_core::node_interfaces::Graph,
     fuse_core::node_interfaces::Logging,
     fuse_core::node_interfaces::Parameters,
+    fuse_core::node_interfaces::Services,
+    fuse_core::node_interfaces::TimeSource,
+    fuse_core::node_interfaces::Timers,
     fuse_core::node_interfaces::Topics,
     fuse_core::node_interfaces::Waitables
   > interfaces,
   const std::string & name)
 {
   interfaces_ = interfaces;
-  fuse_core::AsyncPublisher::initialize(interfaces_, name);
+  fuse_core::AsyncPublisher::initialize(interfaces, name);
 }
 
 void SerializedPublisher::onInit()
