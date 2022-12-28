@@ -52,7 +52,7 @@ namespace fuse_publishers
 {
 
 SerializedPublisher::SerializedPublisher() :
-  fuse_core::AsyncPublisher(),
+  fuse_core::AsyncPublisher(1),
   frame_id_("map"),
   graph_publisher_throttled_callback_(
       std::bind(&SerializedPublisher::graphPublisherCallback, this, std::placeholders::_1, std::placeholders::_2))
@@ -68,11 +68,10 @@ void SerializedPublisher::initialize(
     fuse_core::node_interfaces::Topics,
     fuse_core::node_interfaces::Waitables
   > interfaces,
-  const std::string & name,
-  size_t thread_count)
+  const std::string & name)
 {
   interfaces_ = interfaces;
-  fuse_core::AsyncPublisher::initialize(interfaces_, name, thread_count);
+  fuse_core::AsyncPublisher::initialize(interfaces_, name);
 }
 
 void SerializedPublisher::onInit()

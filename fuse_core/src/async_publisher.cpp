@@ -37,9 +37,9 @@
 namespace fuse_core
 {
 
-AsyncPublisher::AsyncPublisher()
+AsyncPublisher::AsyncPublisher(size_t thread_count)
 : name_("uninitialized"),
-  executor_thread_count_(1)
+  executor_thread_count_(thread_count)
 {
 }
 
@@ -108,18 +108,6 @@ void AsyncPublisher::initialize(
   auto result = callback->getFuture();
   callback_queue_->addCallback(callback);
   result.wait();
-}
-
-void AsyncPublisher::initialize(
-  node_interfaces::NodeInterfaces<
-    node_interfaces::Base,
-    node_interfaces::Waitables
-  > interfaces,
-  const std::string & name,
-  size_t thread_count)
-{
-  executor_thread_count_ = thread_count;
-  initialize(interfaces, name);
 }
 
 void AsyncPublisher::notify(Transaction::ConstSharedPtr transaction, Graph::ConstSharedPtr graph)

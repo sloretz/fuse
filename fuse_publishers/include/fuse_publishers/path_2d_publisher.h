@@ -84,8 +84,7 @@ public:
       fuse_core::node_interfaces::Topics,
       fuse_core::node_interfaces::Waitables
     > interfaces,
-    const std::string & name,
-    size_t thread_count);
+    const std::string & name);
 
   /**
    * @brief Perform any required post-construction initialization, such as advertising publishers or reading from the
