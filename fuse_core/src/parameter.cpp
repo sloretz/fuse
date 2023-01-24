@@ -42,25 +42,25 @@
 namespace fuse_core
 {
 std::unordered_set<std::string>
-list_parameter_overrides_at_prefix(
+list_parameter_override_prefixes(
   node_interfaces::NodeInterfaces<node_interfaces::Parameters> interfaces,
-  std::string prefix, size_t depth)
+  std::string prefix)
 {
   const std::map<std::string, rclcpp::ParameterValue> & overrides =
-      interfaces.get_node_parameters_interface()->get_parameter_overrides();
-  return detail::list_parameter_overrides_at_prefix(overrides, prefix, depth);
+    interfaces.get_node_parameters_interface()->get_parameter_overrides();
+  return detail::list_parameter_override_prefixes(overrides, prefix);
 }
 
 std::unordered_set<std::string>
-detail::list_parameter_overrides_at_prefix(
+detail::list_parameter_override_prefixes(
   const std::map<std::string, rclcpp::ParameterValue> & overrides,
-  std::string prefix, size_t depth)
+  std::string prefix)
 {
   // TODO(sloretz) ROS 2 must have this in a header somewhere, right?
   const char kParamSeparator = '.';
 
   // Find all overrides starting with "prefix.", unless the prefix is empty.
-  // If the prefix is empty then return all parameter overrides.
+  // If the prefix is empty then look at all parameter overrides.
   if (!prefix.empty() && prefix.back() != kParamSeparator) {
     prefix += kParamSeparator;
   }
@@ -75,18 +75,10 @@ detail::list_parameter_overrides_at_prefix(
     assert(prefix.size() < name.size());
     // TODO(sloretz) use string::starts_with in c++20
     if (name.rfind(prefix, 0) == 0) {  // if name starts with prefix
-      if (depth == 0) {
-        // If not using depth, add the name no matter what
-        output_names.insert(name);
-      } else {
-        // Truncate names to at most the requested depth
-        size_t separator_pos = name.find(kParamSeparator, prefix.size());
-        for (size_t l = depth; l > 0 && separator_pos != std::string::npos; --l) {
-          separator_pos = name.find(kParamSeparator, separator_pos);
-        }
-        // Insert truncated name
-        output_names.insert(name.substr(0, separator_pos));
-      }
+      // Truncate names to the next separator
+      size_t separator_pos = name.find(kParamSeparator, prefix.size());
+      // Insert truncated name
+      output_names.insert(name.substr(0, separator_pos));
     }
   }
   return output_names;

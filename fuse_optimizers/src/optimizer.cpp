@@ -121,8 +121,8 @@ void Optimizer::loadMotionModels()
   std::vector<ModelConfig> motion_model_config;
 
   std::unordered_set<std::string> motion_model_names =
-    fuse_core::list_parameter_overrides_at_prefix(
-      interfaces_, "motion_models.", 1);
+    fuse_core::list_parameter_override_prefixes(
+      interfaces_, "motion_models.");
 
   // declare config parameters for each model
   for(const auto & param_name : motion_model_names){
@@ -188,8 +188,8 @@ void Optimizer::loadSensorModels()
   std::vector<ModelConfig> sensor_model_config;
 
   std::unordered_set<std::string> sensor_model_names =
-    fuse_core::list_parameter_overrides_at_prefix(
-      interfaces_, "sensor_models.", 1);
+    fuse_core::list_parameter_override_prefixes(
+      interfaces_, "sensor_models.");
 
   // declare config parameters for each model
   for(const auto & param_name : sensor_model_names){
@@ -311,8 +311,8 @@ void Optimizer::loadPublishers()
   std::vector<PublisherConfig> publisher_config;
 
   std::unordered_set<std::string> publisher_names =
-    fuse_core::list_parameter_overrides_at_prefix(
-      interfaces_, "publishers.", 1);
+    fuse_core::list_parameter_override_prefixes(
+      interfaces_, "publishers.");
 
   // declare config parameters for each model
   for(const auto & param_name : publisher_names){

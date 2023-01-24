@@ -34,6 +34,7 @@
 #ifndef FUSE_CORE__PARAMETER_HPP_
 #define FUSE_CORE__PARAMETER_HPP_
 
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -125,31 +126,43 @@ T getParam(
   }
 }
 
-namespace detail {
+namespace detail
+{
 /** @brief Internal function for unit testing.
  * @internal
 */
 std::unordered_set<std::string>
-list_parameter_overrides_at_prefix(
+list_parameter_override_prefixes(
   const std::map<std::string, rclcpp::ParameterValue> & overrides,
-  std::string prefix, size_t depth);
+  std::string prefix);
 }  // namespace detail
 
 /**
- * @brief Get pararameter overrides that exist at a given prefix.
- * 
+ * @brief Get pararameter overrides that have a given prefix
+ *
  * Example:
- *  Say the given parameter overrides are foo, foo.bar, foo.bar.baz, and foobar.baz
- *  Given prefix "foo" and depth 0, this will return foo.bar and foo.bar.baz
- *  Given prefix "foo" and depth 1, this will return foo.bar
- * 
+ *  Say the given parameter overrides are foo, foo.baz, foo.bar.baz, and foobar.baz
+ *  Given prefix "", this will return foo, and foobar
+ *  Given prefix "foo", this will return foo.baz and foo.bar
+ *  Given prefix "foo.bar", this will return foo.bar.baz
+ *  Given prefix "foo.baz", this will return an empty list
+ *
+ *  All overrides are searched and returned, so that this can be used to
+ *  conditionally declare parameters.
+ *  The returned names may or may not be valid parameters, but instead are
+ *  prefixes of valid parameters.
+ *  The prefix itself will never be in the returned output.
+ *
+ *
  * @param[in] interfaces - The node interfaces used to get the parameter overrides
- * @param[in] prefix - the name of a parameter 
+ * @param[in] prefix - the parameter prefix
+ * @param[in] max_depth - how deep to return parameter override names, or 0 for
+ *    unlimited depth.
 */
 std::unordered_set<std::string>
-list_parameter_overrides_at_prefix(
+list_parameter_override_prefixes(
   node_interfaces::NodeInterfaces<node_interfaces::Parameters> interfaces,
-  std::string prefix, size_t depth = 0);
+  std::string prefix);
 
 /**
  * @brief Utility method for handling required ROS params
