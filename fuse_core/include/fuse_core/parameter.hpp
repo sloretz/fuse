@@ -138,7 +138,7 @@ list_parameter_override_prefixes(
 }  // namespace detail
 
 /**
- * @brief Get pararameter overrides that have a given prefix
+ * @brief Get parameter overrides that have a given prefix
  *
  * Example:
  *  Say the given parameter overrides are foo, foo.baz, foo.bar.baz, and foobar.baz
