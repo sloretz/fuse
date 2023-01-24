@@ -36,6 +36,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <fuse_core/eigen.hpp>
@@ -123,6 +124,32 @@ T getParam(
     throw rclcpp::exceptions::InvalidParameterTypeException(parameter_name, ex.what());
   }
 }
+
+namespace detail {
+/** @brief Internal function for unit testing.
+ * @internal
+*/
+std::unordered_set<std::string>
+list_parameter_overrides_at_prefix(
+  const std::map<std::string, rclcpp::ParameterValue> & overrides,
+  std::string prefix, size_t depth);
+}  // namespace detail
+
+/**
+ * @brief Get pararameter overrides that exist at a given prefix.
+ * 
+ * Example:
+ *  Say the given parameter overrides are foo, foo.bar, foo.bar.baz, and foobar.baz
+ *  Given prefix "foo" and depth 0, this will return foo.bar and foo.bar.baz
+ *  Given prefix "foo" and depth 1, this will return foo.bar
+ * 
+ * @param[in] interfaces - The node interfaces used to get the parameter overrides
+ * @param[in] prefix - the name of a parameter 
+*/
+std::unordered_set<std::string>
+list_parameter_overrides_at_prefix(
+  node_interfaces::NodeInterfaces<node_interfaces::Parameters> interfaces,
+  std::string prefix, size_t depth = 0);
 
 /**
  * @brief Utility method for handling required ROS params
